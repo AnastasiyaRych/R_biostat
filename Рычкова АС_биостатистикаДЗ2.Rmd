@@ -1,0 +1,270 @@
+Задание 1
+```{r}
+library(tidyverse)
+data <- read.csv("D:/ide/R/wisconsin_breast_cancer.csv", header = TRUE)
+```
+#переименуем столбцы
+```{r}
+colnames(data) <- c("id", "diagnosis", "mean_radius", "mean_texture", "mean_perimeter", 
+                    "mean_area", "mean_smoothness", "mean_compactness", "mean_concavity", 
+                    "mean_concave_points", "mean_symmetry", "mean_fractal_dimension", 
+                    "radius_error", "texture_error", "perimeter_error", "area_error", 
+                    "smoothness_error", "compactness_error", "concavity_error", 
+                    "concave_points_error", "symmetry_error", "fractal_dimension_error", 
+                    "worst_radius", "worst_texture", "worst_perimeter", "worst_area", 
+                    "worst_smoothness", "worst_compactness", "worst_concavity", 
+                    "worst_concave_points", "worst_symmetry", "worst_fractal_dimension")
+```
+
+#все интересующие нас данные в 1 задании приведены к верному типу данных
+
+#построим для начала модели линейной регрессии
+#Модель линейной регрессии для среднего радиуса опухоли (зависимая) и средней площади (предиктор)
+```{r}
+model_area <- lm(mean_radius ~ mean_area, data = data)
+model_area  %>% summary()
+```
+#согласно полученным данным, переменная "средняя площадь" является важной переменной для предсказания среднего радиуса опухоли (р<0.05). R2=0.9748, что говорит нам о том, что была построена выосокоэффективная модель, и предсказанные значения будут очень близки к фактическим
+
+#проверим применимость модели линейной регрессии (проверим линейную зависимость исследуемых данных, нормальность распределения и гомоскедастичность остатков)
+```{r}
+ggplot(data, aes(x = mean_radius, y = mean_area)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Средний радиус и средняя площадь")
+```
+#видим линейную зависимость данных, хотя есть выбросы в области низких и высоких значений
+
+```{r}
+library(car)
+qqPlot(residuals(model_area))
+```
+#видим большое кол-во выбросов, данная модель не так хороша, как казалось на первый взгляд
+
+```{r}
+ggplot(data = data.frame(fitted = fitted(model_area), residuals = resid(model_area)),
+       aes(x = fitted, y = residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "Остатки и предсказанные значения")
+```
+#предположение о гомоскедастичности также не выполняется 
+Попробуем построить гамма-регрессию
+
+```{r}
+model_area_gamma <- glm(mean_radius ~ mean_area, data = data, family = Gamma(link = "log"))
+model_area_gamma  %>% summary()
+```
+```{r}
+library(car)
+qqPlot(residuals(model_area_gamma))
+```
+
+```{r}
+# Тест на нормальность
+shapiro.test(residuals(model_area_gamma))
+
+# Тест на гетероскедастичность
+library(lmtest)
+bptest(model_area_gamma)
+```
+Согласно полученному графику и обсчитанным данным, данная модель также получилась некачественной. Остатки не распределены нормально и гетероскедастичны. Неэффективные модели мы получаем скорее всего из-за большого количества выбросов в данных.
+
+Попробуем построить модель для среднего радиуса опухоли (зависимая) и средней периметра (предиктор)
+```{r}
+model_perimeter <- lm(mean_radius ~ mean_perimeter, data = data)
+model_perimeter  %>% summary()
+```
+Cогласно полученным данным, переменная "средняя площадь" является важной переменной для предсказания среднего радиуса опухоли (р<0.05). Получен хороший коэффициент детерминации R2=0.9957
+Проверим применимость линейной модели
+
+```{r}
+ggplot(data, aes(x = mean_radius, y = mean_perimeter)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Средний радиус и средний периметр")
+```
+Видим практически идеальную линейную зависимость данных
+Проверим нормальность распределения остатков
+```{r}
+qqPlot(residuals(model_perimeter))
+```
+Видим выбросы в области низких значений, но выглядит в общем и целом неплохо, по сравнению с прошлой моделью
+
+Проверим гомоскедастичность
+```{r}
+ggplot(data = data.frame(fitted = fitted(model_perimeter), residuals = resid(model_perimeter)),
+       aes(x = fitted, y = residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "Остатки и предсказанные значения")
+```
+Видим небольшое скопление значений, но при этом имеется приблизительно равное кол-во значений выше и ниже 0
+В общем и целом, можем принять данную модель
+
+Построим модель для среднего радиуса опухоли (зависимая) и средней симметричности (предиктор)
+```{r}
+model_symmetry <- lm(mean_radius ~ mean_symmetry, data = data)
+model_symmetry  %>% summary()
+```
+Видим иную ситуацию нежели для других моделей линейной регрессии. Параметр симметрии также является значимым (р<0.05). Но коэффициент детерминации получен низкий, всего 2%.
+Проверим полученную модель
+```{r}
+ggplot(data, aes(x = mean_radius, y = mean_symmetry)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Средний радиус и средняя симметричность")
+```
+Видим очень слабую линейную зависимость
+
+```{r}
+qqPlot(residuals(model_symmetry))
+```
+
+```{r}
+ggplot(data = data.frame(fitted = fitted(model_symmetry), residuals = resid(model_symmetry)),
+       aes(x = fitted, y = residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "Остатки и предсказанные значения")
+```
+Остатки полученной модели не распределены нормально (много выбросов в области высоких значений), но при этом остатки ближе к гомоскедастичности, чем к гетерескедастичности
+
+Попробуем для этих переменных построить модель полиномиальной регрессии
+```{r}
+model_symmetry_poly <- lm(mean_radius ~ poly(mean_symmetry, degree = 2), data = data)
+model_symmetry_poly  %>% summary()
+```
+
+```{r}
+qqPlot(residuals(model_symmetry_poly))
+```
+Видим такой же большой выброс в области больших значений
+
+
+```{r}
+ggplot(data = data.frame(fitted = fitted(model_symmetry_poly), residuals = resid(model_symmetry_poly)),
+       aes(x = fitted, y = residuals)) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(title = "Остатки и предсказанные значения")
+```
+При этом наблюдаем гомоскедастичность остатков 
+
+Проверим отличаются ли наши модели
+```{r}
+anova(model_symmetry, model_symmetry_poly)
+```
+Видим, что между нашими моделями нет статистически значимого различия. Они обе не очень хорошие)
+
+Задание 2.
+Для построения моделей для данного задания будем использовать логистическую регрессию, тк целевая переменная у нас бинарная
+
+```{r}
+data_mode <- data
+```
+
+```{r}
+# Преобразование диагноза в числовые значения (M = 1, B = 0)
+data_mode$diagnosis <- ifelse(data_mode$diagnosis == "M", 1, 0)
+```
+
+```{r}
+# Модель 1: Вероятность от среднего радиуса
+model_radius <- glm(diagnosis ~ mean_radius, data = data_mode, family = binomial(link = "logit"))
+model_radius  %>% summary()
+```
+Видим, что переменная значима
+
+Построим график
+```{r}
+new_data_radius <- data.frame(mean_radius = seq(min(data$mean_radius), max(data$mean_radius), length.out = 100))
+new_data_radius$probability <- predict(model_radius, newdata = new_data_radius, type = "response")
+ggplot(data, aes(x = mean_radius, y = diagnosis)) +
+  geom_point(color = "blue", alpha = 0.6, position = position_jitter(width = 0.1, height = 0.1)) +
+  geom_line(data = new_data_radius, aes(x = mean_radius, y = probability), color = "red") +
+  ggtitle("Вероятность злокачественной опухоли от среднего радиуса") +
+  xlab("Средний радиус") +
+  ylab("Вероятность (1 = злокачественная)") +
+  theme_minimal()
+```
+Согласно графику можем сделать следующие выводы: 1) Большинство точек с диагнозом (0) находится в нижней части графика, где предсказанная вероятность злокачественности близка к 0. Это означает, что модель хорошо различает доброкачественные случаи при малых значениях среднего радиуса. 2) Точки с диагнозом 1 находятся в верхней части графика, где предсказанная вероятность злокачественности близка к 1. Значит модель также хорошо различает злокачественные случаи при больших значениях среднего радиуса. 3) Красная кривая имеет S образную форму, что характерно для логистической регрессии. Таким образом, модель эффективно определяет зависимость между средним радиусом и вероятностью злокачественности.
+
+
+Сделаем то же самое для средней площади и средней тукстуры
+
+```{r}
+# Модель 2: Вероятность от средней площади
+model_area2 <- glm(diagnosis ~ mean_area, data = data_mode, family = binomial(link = "logit"))
+model_area2  %>% summary()
+
+# Модель 3: Вероятность от средней текстуры
+model_texture <- glm(diagnosis ~ mean_texture, data = data_mode, family = binomial(link = "logit"))
+model_texture  %>% summary()
+
+new_data_area <- data.frame(mean_area = seq(min(data_mode$mean_area), max(data_mode$mean_area), length.out = 100))
+new_data_texture <- data.frame(mean_texture = seq(min(data_mode$mean_texture), max(data_mode$mean_texture), length.out = 100))
+
+new_data_area$probability <- predict(model_area2, newdata = new_data_area, type = "response")
+new_data_texture$probability <- predict(model_texture, newdata = new_data_texture, type = "response")
+
+# График для модели 2: Средняя площадь
+ggplot(data, aes(x = mean_area, y = diagnosis)) +
+  geom_point(color = "blue", alpha = 0.6, position = position_jitter(width = 0.1, height = 0.1)) +
+  geom_line(data = new_data_area, aes(x = mean_area, y = probability), color = "red") +
+  ggtitle("Вероятность злокачественной опухоли от средней площади") +
+  xlab("Средняя площадь") +
+  ylab("Вероятность (1 = злокачественная)") +
+  theme_minimal()
+
+# График для модели 3: Средняя текстура
+ggplot(data, aes(x = mean_texture, y = diagnosis)) +
+  geom_point(color = "blue", alpha = 0.6, position = position_jitter(width = 0.1, height = 0.1)) +
+  geom_line(data = new_data_texture, aes(x = mean_texture, y = probability), color = "red") +
+  ggtitle("Вероятность злокачественной опухоли от средней текстуры") +
+  xlab("Средняя текстура") +
+  ylab("Вероятность (1 = злокачественная)") +
+  theme_minimal()
+```
+Выводы по модели 2: 1) переменная средняя площадь значима, 2) согласно графику, модель эффективно определяет зависимость между средней площадью и вероятностью злокачественной опухоли, тк мы также наблюдаем S образную кривую, и четко выраженное скопление точек в области М и в области В с минимальным кол-вом выбросов
+
+Выводы по модели 3: 1) переменная средняя текстура значима, 2) согласно графику, модель менее эффективно определяет вероятность злокачественности, тк S кривая менее выражена.
+
+Создадим модель вероятности возникновения опухоли от 3 факторов:
+```{r}
+model_combined <- glm(diagnosis ~ mean_radius + mean_area + mean_texture, data = data_mode, family = binomial(link = "logit"))
+model_combined  %>% summary()
+```
+В результате только признак средней текстуры оказывает значимое влияние на вероятность злокачественной опухоли в данной модели.
+
+Задание 3
+Расчитаем выборку
+```{r}
+# Параметры
+Z <- qnorm(0.975)  # Критическое значение для α = 0.05 (двусторонний тест)
+HR <- 2            # Hazard Ratio
+p1 <- 0.5          # Доля пациентов в первой группе
+p2 <- 0.5          # Доля пациентов во второй группе
+d <- 0.8           # Ожидаемая доля событий
+
+# Вычисление ln(HR)
+ln_HR <- log(HR)
+
+# Расчет n1 и n2
+n1 <- ((Z / 2 + Z)^2 * ln_HR^2 * p1 * p2 * d)
+n2 <- n1
+
+# Общая выборка
+n <- n1 + n2
+
+# Вывод результатов
+cat("n1 =", round(n1, 2), "\n")
+cat("n2 =", round(n2, 2), "\n")
+cat("Общая выборка n =", round(n, 2), "\n")
+```
+
+Получились неадекватные значения выборки (при ручном подсчете также). Возможно ошибка в предоставленной формуле
+
+
+
+
